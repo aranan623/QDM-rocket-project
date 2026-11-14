@@ -13,6 +13,10 @@
     border-radius:4px;margin-bottom:16px;}
   #signal-indicator.ok{background:rgba(95,217,122,0.15);color:#5FD97A;}
   #signal-indicator.lost{background:rgba(255,107,107,0.15);color:#FF6B6B;}
+  #launch-hold{font-size:22px;font-weight:700;padding:12px;text-align:center;border-radius:8px;margin-bottom:16px;}
+  #launch-hold.hold{background:rgba(255,107,107,0.18);color:#FF6B6B;border:1px solid #FF6B6B;}
+  #launch-hold.clear{background:rgba(95,217,122,0.18);color:#5FD97A;border:1px solid #5FD97A;}
+  #link-detail{font-family:monospace;font-size:12px;color:#8B98A8;margin-left:10px;}
   #readouts{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:24px;}
   #readouts div{background:#12161F;border:1px solid #252C38;border-radius:8px;padding:10px 12px;font-size:13px;color:#8B98A8;}
   #readouts span{display:block;font-size:20px;color:#E7ECF2;font-family:monospace;margin-top:4px;}
@@ -21,7 +25,8 @@
 </head>
 <body>
   <div id="status-banner">READY</div>
-  <div id="signal-indicator" class="lost">NO SIGNAL</div>
+  <div id="launch-hold" class="hold">HOLD: do not start the countdown</div>
+  <div id="signal-indicator" class="lost">NO SIGNAL</div><span id="link-detail"></span>
 
   <div id="readouts">
     <div>Altitude (m)<span id="v-altitude">--</span></div>
@@ -41,7 +46,6 @@
 
 <script>
 const socket = io();
-let signalTimeout;
 const MAX_POINTS = 150;
 
 function makeChart(ctx, datasets){
@@ -73,15 +77,23 @@ function pushPoint(chart, label, values){
   chart.update("none");
 }
 
-socket.on("telemetry", (t) => {
-  clearTimeout(signalTimeout);
+// Launch hold point: the server decides SIGNAL OK from the packet rate and age (link_monitor.py)
+function showLink(s){
   const sig = document.getElementById("signal-indicator");
-  sig.textContent = "SIGNAL OK";
-  sig.className = "ok";
-  signalTimeout = setTimeout(() => {
-    sig.textContent = "NO SIGNAL";
-    sig.className = "lost";
-  }, 1000);
+  const hold = document.getElementById("launch-hold");
+  sig.textContent = s.signal_ok ? "SIGNAL OK" : "NO SIGNAL";
+  sig.className = s.signal_ok ? "ok" : "lost";
+  hold.textContent = s.signal_ok ? "SIGNAL OK: clear to start the countdown" : "HOLD: do not start the countdown";
+  hold.className = s.signal_ok ? "clear" : "hold";
+  const age = s.last_packet_age_s === null ? "--" : s.last_packet_age_s.toFixed(1);
+  document.getElementById("link-detail").textContent =
+    `${s.packet_rate_hz.toFixed(1)} packets/s, last ${age} s ago, ${s.bad_packets} bad`;
+}
+
+socket.on("link", showLink);
+
+socket.on("telemetry", (t) => {
+  showLink(t);
 
   document.getElementById("status-banner").textContent = t.flight_state;
   document.getElementById("v-altitude").textContent = t.altitude_m.toFixed(1);
