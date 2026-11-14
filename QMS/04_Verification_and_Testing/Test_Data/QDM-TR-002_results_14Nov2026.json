@@ -1,0 +1,75 @@
+{
+ "python": "3.12.10",
+ "platform": "macOS-26.6.2-arm64-arm-64bit",
+ "run_seconds": 60.0,
+ "header_fields": 17,
+ "rows": 578,
+ "complete_rows": 578,
+ "file_ends_with_newline": true,
+ "span_s": 59.87,
+ "rate_hz": 9.638,
+ "gap_mean_ms": 103.76,
+ "gap_min_ms": 100,
+ "gap_max_ms": 107,
+ "gaps_over_150ms": 0,
+ "max_altitude_m": 215.5,
+ "last_line_complete": true,
+ "apogee_flag_rows": 493,
+ "launched_flag_rows": 558,
+ "decode_cases": [
+  [
+   "D1 valid text packet",
+   "decoded",
+   "decoded",
+   "PASS"
+  ],
+  [
+   "D2 valid bytes packet with CR/LF",
+   "decoded",
+   "decoded",
+   "PASS"
+  ],
+  [
+   "D3 15 fields (one missing)",
+   "ValueError",
+   "ValueError",
+   "PASS"
+  ],
+  [
+   "D4 17 fields (one extra)",
+   "ValueError",
+   "ValueError",
+   "PASS"
+  ],
+  [
+   "D5 non-numeric field",
+   "ValueError",
+   "ValueError",
+   "PASS"
+  ],
+  [
+   "D6 empty packet",
+   "ValueError",
+   "ValueError",
+   "PASS"
+  ],
+  [
+   "D7 corrupted bytes",
+   "ValueError",
+   "ValueError",
+   "PASS"
+  ],
+  [
+   "D8 empty field",
+   "ValueError",
+   "ValueError",
+   "PASS"
+  ],
+  [
+   "D9 encode/decode round trip",
+   "identical",
+   "identical",
+   "PASS"
+  ]
+ ]
+}
