@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Ground Station</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  body{background:#0B0E14;color:#E7ECF2;font-family:-apple-system,sans-serif;margin:0;padding:20px;}
+  #status-banner{font-size:28px;font-weight:700;letter-spacing:0.05em;padding:14px;text-align:center;
+    border-radius:8px;background:#12161F;border:1px solid #252C38;margin-bottom:12px;}
+  #signal-indicator{display:inline-block;font-family:monospace;font-size:12px;padding:4px 10px;
+    border-radius:4px;margin-bottom:16px;}
+  #signal-indicator.ok{background:rgba(95,217,122,0.15);color:#5FD97A;}
+  #signal-indicator.lost{background:rgba(255,107,107,0.15);color:#FF6B6B;}
+  #readouts{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:24px;}
+  #readouts div{background:#12161F;border:1px solid #252C38;border-radius:8px;padding:10px 12px;font-size:13px;color:#8B98A8;}
+  #readouts span{display:block;font-size:20px;color:#E7ECF2;font-family:monospace;margin-top:4px;}
+  canvas{background:#12161F;border:1px solid #252C38;border-radius:8px;margin-bottom:16px;max-height:220px;}
+</style>
+</head>
+<body>
+  <div id="status-banner">READY</div>
+  <div id="signal-indicator" class="lost">NO SIGNAL</div>
+
+  <div id="readouts">
+    <div>Altitude (m)<span id="v-altitude">--</span></div>
+    <div>Vertical velocity (m/s)<span id="v-vv">--</span></div>
+    <div>Roll (deg)<span id="v-roll">--</span></div>
+    <div>Pitch (deg)<span id="v-pitch">--</span></div>
+    <div>Yaw (deg)<span id="v-yaw">--</span></div>
+    <div>Temp (C)<span id="v-temp">--</span></div>
+    <div>Pressure (hPa)<span id="v-pressure">--</span></div>
+    <div>Packets received<span id="v-count">0</span></div>
+    <div>Max altitude (m)<span id="v-maxalt">--</span></div>
+  </div>
+
+  <canvas id="altitudeChart" height="70"></canvas>
+  <canvas id="velocityChart" height="70"></canvas>
+  <canvas id="attitudeChart" height="70"></canvas>
+
+<script>
+const socket = io();
+let signalTimeout;
+const MAX_POINTS = 150;
+
+function makeChart(ctx, datasets){
+  return new Chart(ctx, {
+    type: "line",
+    data: { labels: [], datasets: datasets },
+    options: { animation:false, responsive:true,
+      scales: { x: { title:{display:true,text:"time (s)"} } } }
+  });
+}
+
+const altitudeChart = makeChart(document.getElementById("altitudeChart"),
+  [{ label:"Altitude (m)", data:[], borderColor:"#5FD97A", fill:false, pointRadius:0 }]);
+const velocityChart = makeChart(document.getElementById("velocityChart"),
+  [{ label:"Vertical velocity (m/s)", data:[], borderColor:"#E8A33D", fill:false, pointRadius:0 }]);
+const attitudeChart = makeChart(document.getElementById("attitudeChart"), [
+  { label:"Roll", data:[], borderColor:"#FF6B6B", fill:false, pointRadius:0 },
+  { label:"Pitch", data:[], borderColor:"#5FD97A", fill:false, pointRadius:0 },
+  { label:"Yaw", data:[], borderColor:"#4A9EFF", fill:false, pointRadius:0 }
+]);
+
+function pushPoint(chart, label, values){
+  chart.data.labels.push(label);
+  chart.data.datasets.forEach((ds,i) => ds.data.push(values[i]));
+  if (chart.data.labels.length > MAX_POINTS){
+    chart.data.labels.shift();
+    chart.data.datasets.forEach(ds => ds.data.shift());
+  }
+  chart.update("none");
+}
+
+socket.on("telemetry", (t) => {
+  clearTimeout(signalTimeout);
+  const sig = document.getElementById("signal-indicator");
+  sig.textContent = "SIGNAL OK";
+  sig.className = "ok";
+  signalTimeout = setTimeout(() => {
+    sig.textContent = "NO SIGNAL";
+    sig.className = "lost";
+  }, 1000);
+
+  document.getElementById("status-banner").textContent = t.flight_state;
+  document.getElementById("v-altitude").textContent = t.altitude_m.toFixed(1);
+  document.getElementById("v-vv").textContent = t.vertical_velocity_mps.toFixed(1);
+  document.getElementById("v-roll").textContent = t.roll_deg.toFixed(1);
+  document.getElementById("v-pitch").textContent = t.pitch_deg.toFixed(1);
+  document.getElementById("v-yaw").textContent = t.yaw_deg.toFixed(1);
+  document.getElementById("v-temp").textContent = t.temp_c.toFixed(1);
+  document.getElementById("v-pressure").textContent = t.pressure_hpa.toFixed(1);
+  document.getElementById("v-count").textContent = t.packet_count;
+  document.getElementById("v-maxalt").textContent = t.max_altitude.toFixed(1);
+
+  const tSec = (t.time_ms / 1000).toFixed(1);
+  pushPoint(altitudeChart, tSec, [t.altitude_m]);
+  pushPoint(velocityChart, tSec, [t.vertical_velocity_mps]);
+  pushPoint(attitudeChart, tSec, [t.roll_deg, t.pitch_deg, t.yaw_deg]);
+});
+</script>
+</body>
+</html>
