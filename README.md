@@ -64,6 +64,7 @@ Dashboard: `http://groundstation.local:5000`
 | `fake_telemetry.py` | Simulated flight for testing without a radio |
 | `log_telemetry.py` | Standalone CSV logging test |
 | `test_packet_format.py` | Encode/decode round-trip self-test |
+| `test_flight_profile.py` | Self-test for the simulated flight profile |
 | `test_spi_connection.py` | Checks the Pi can talk to the Ra-02 over SPI |
 | `templates/dashboard.html` | Live dashboard page |
 
