@@ -1,9 +1,10 @@
-import sys, threading, os, csv
+import sys, threading, os, csv, time
 from datetime import datetime
-from flask import Flask, render_template
+from flask import Flask, render_template, jsonify
 from flask_socketio import SocketIO
 from telemetry_format import FIELD_NAMES, decode_packet
 from fake_telemetry import generate_fake_telemetry
+from link_monitor import LinkMonitor
 
 SIMULATE = "--simulate" in sys.argv
 
@@ -18,6 +19,7 @@ packet_count = 0
 max_altitude = 0.0
 csv_file = None
 writer = None
+link = LinkMonitor()
 
 def open_csv():
     global csv_file, writer
@@ -46,6 +48,7 @@ def update_flight_state(t):
 def handle_telemetry(telemetry):
     global packet_count
     packet_count += 1
+    link.good_packet()
     telemetry["received_at"] = datetime.now().isoformat()
     update_flight_state(telemetry)
 
@@ -56,7 +59,14 @@ def handle_telemetry(telemetry):
     telemetry["packet_count"] = packet_count
     telemetry["flight_state"] = flight_state
     telemetry["max_altitude"] = max_altitude
+    telemetry.update(link.status())
     socketio.emit("telemetry", telemetry)
+
+def link_status_loop():
+    # Sent twice a second even when no packets arrive, so a lost link shows HOLD straight away
+    while True:
+        socketio.emit("link", link.status())
+        time.sleep(0.5)
 
 def simulate_loop():
     print("SIMULATE MODE: generating fake telemetry, no radio used.")
@@ -86,15 +96,21 @@ def radio_loop():
             try:
                 handle_telemetry(decode_packet(raw))
             except ValueError as e:
+                link.bad_packet()
                 print("Skipped a bad packet:", e)
 
 @app.route("/")
 def index():
     return render_template("dashboard.html")
 
+@app.route("/status")
+def status():
+    return jsonify({**link.status(), "flight_state": flight_state, "packets": packet_count})
+
 if __name__ == "__main__":
     open_csv()
     target = simulate_loop if SIMULATE else radio_loop
     thread = threading.Thread(target=target, daemon=True)
     thread.start()
+    threading.Thread(target=link_status_loop, daemon=True).start()
     socketio.run(app, host="0.0.0.0", port=5000)
